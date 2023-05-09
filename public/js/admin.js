@@ -5,13 +5,6 @@
 		return this.init();
 	};
 
-	//setting up csrf token
-	$.ajaxSetup({
-		headers: {
-			'X-CSRF-TOKEN': window.csrf
-		}
-	});
-
 	admin.prototype = {
 
 		//properties
@@ -36,14 +29,6 @@
 		 * @type jQuery object
 		 */
 		$dataTable: null,
-
-		/*
-		 * If this is true, the dataTable is scrollable instead of
-		 * skipping columns at the end
-		 *
-		 * @type bool
-		 */
-		dataTableScrollable: false,
 
 		/*
 		 * The pixel points where the columns are hidden
@@ -107,11 +92,6 @@
 			 * string
 			 */
 			modelTitle: ko.observable(''),
-
-			/* The sub title for this data model
-			 * string
-			 */
-			subTitle: ko.observable(''),
 
 			/* The title for single items of this model
 			 * string
@@ -182,11 +162,6 @@
 			 * array
 			 */
 			originalEditFields: [],
-
-			/* The original data when fetched from the server initially
-			 * object
-			 */
-			originalData: {},
 
 			/* The model edit fields
 			 * array
@@ -283,7 +258,7 @@
 			/**
 			 * Saves the item with the current settings. If id is 0, the server interprets it as a new item
 			 */
-			saveItem: function(norefresh)
+			saveItem: function()
 			{
 				var self = this,
 					saveData = ko.mapping.toJS(self);
@@ -314,7 +289,6 @@
 					complete: function()
 					{
 						self.freezeForm(false);
-						window.admin.resizePage();
 					},
 					success: function(response)
 					{
@@ -322,14 +296,11 @@
 							self.statusMessage(self.languages['saved']).statusMessageType('success');
 							self.updateRows();
 							self.updateSelfRelationships();
-
-							if (norefresh) return;
-
 							self.setData(response.data);
 
 							setTimeout(function()
 							{
-								History.pushState({modelName: self.modelName()}, document.title, route + self.modelName());
+								History.pushState({modelName: self.modelName()}, null, route + self.modelName());
 							}, 200);
 						}
 						else
@@ -341,142 +312,38 @@
 			/**
 			 * Deletes the active item
 			 */
-			deleteItem: function(root, event, key)
+			deleteItem: function()
 			{
-				var self = root;
+				var self = this,
+					conf = confirm(self.languages['delete_active_item']);
 
-				swal({
-					title: '',
-				    text: adminData.languages['delete_active_item'],
-				    type: "warning",
-				    showCancelButton: true,
-				    confirmButtonColor: "#DD6B55",
-				    cancelButtonText: adminData.languages['cancel'],
-				    confirmButtonText: adminData.languages['delete'],
-					showLoaderOnConfirm: true,
-				    closeOnConfirm: false
-				}, function() {
-					var mykey = key ? key : self[self.primaryKey]();
+				if (!conf)
+					return false;
 
-					self.freezeForm(true);
+				self.statusMessage(self.languages['deleting']).statusMessageType('');
+				self.freezeForm(true);
 
-					$.ajax({
-						url: base_url + self.modelName() + '/' + mykey + '/delete',
-						data: {_token: csrf},
-						dataType: 'json',
-						type: 'POST',
-						complete: function()
+				$.ajax({
+					url: base_url + self.modelName() + '/' + self[self.primaryKey]() + '/delete',
+					data: {_token: csrf},
+					dataType: 'json',
+					type: 'POST',
+					success: function(response)
+					{
+						if (response.success)
 						{
-							self.freezeForm(false);
-							window.admin.resizePage();
-						},
-						success: function(response)
-						{
-							if (response.success)
+							self.statusMessage(self.languages['deleted']).statusMessageType('success');
+							self.updateRows();
+							self.updateSelfRelationships();
+
+							setTimeout(function()
 							{
-								swal({
-									title: adminData.languages['deleted'],
-									text: "",
-									type: "success",
-									timer: 1000,
-									showConfirmButton: false
-								});
-
-								self.updateRows();
-								self.updateSelfRelationships();
-
-								if (mykey == self[self.primaryKey]()) {
-									setTimeout(function()
-									{
-										History.pushState({modelName: self.modelName()}, document.title, route + self.modelName());
-										$('#sidebar').fadeIn();
-									}, 500);
-								}
-							}
-							else
-								swal(response.error, "", "error");
-						},
-						error: function(response) {
-							swal(adminData.languages['delete_failed'], "", "error");
+								History.pushState({modelName: self.modelName()}, null, route + self.modelName());
+							}, 500);
 						}
-					});
-				});
-			},
-
-			/**
-			 * Deletes selected items
-			 */
-			deleteItems: function()
-			{
-				var self = this;
-				var selected = [];
-
-				$('.select-checkbox').each(function(i, el) {
-					if ($(el).is(':checked')) {
-						selected.push($(el).val());
+						else
+							self.statusMessage(response.error).statusMessageType('error');
 					}
-				});
-
-				if (!selected.length) {
-					swal('', adminData.languages['select_options'], "warning");
-					return;
-				}
-
-				swal({
-					title: '',
-				    text: adminData.languages['delete_items'],
-				    type: "warning",
-				    showCancelButton: true,
-				    confirmButtonColor: "#DD6B55",
-				    cancelButtonText: adminData.languages['cancel'],
-				    confirmButtonText: adminData.languages['delete'],
-					showLoaderOnConfirm: true,
-				    closeOnConfirm: false
-				}, function() {
-					var mykey = selected.join(',');
-
-					self.freezeForm(true);
-
-					$.ajax({
-						url: base_url + self.modelName() + '/batch_delete',
-						data: {_token: csrf, ids: mykey},
-						dataType: 'json',
-						type: 'POST',
-						complete: function()
-						{
-							self.freezeForm(false);
-							window.admin.resizePage();
-						},
-						success: function(response)
-						{
-							if (response.success)
-							{
-								swal({
-									title: adminData.languages['deleted'],
-									text: "",
-									type: "success",
-									timer: 1000,
-									showConfirmButton: false
-								});
-
-								self.updateRows();
-								self.updateSelfRelationships();
-
-								setTimeout(function()
-								{
-									History.pushState({modelName: self.modelName()}, document.title, route + self.modelName());
-									$('#sidebar').fadeIn();
-									$('#select-all').prop('checked',false);
-									$('#delete-all').addClass('disabled');
-								}, 500);
-							}
-							else
-								swal(response.error, "", "error");
-						},
-						error: function(response) {
-							swal(adminData.languages['delete_failed'], "", "error");
-						}
-					});
 				});
 			},
 
@@ -487,7 +354,7 @@
 			{
 				if (!this.loadingItem() && this.activeItem() !== id && this.actionPermissions.view)
 				{
-					History.pushState({modelName: this.modelName(), id: id}, document.title, route + this.modelName() + '/' + id);
+					History.pushState({modelName: this.modelName(), id: id}, null, route + this.modelName() + '/' + id);
 				}
 			},
 
@@ -511,10 +378,9 @@
 
 				//update all the info to the new item state
 				ko.mapping.updateData(self, self.model, self.model);
-				self.originalData = {};
 
 				//scroll to the top of the page
-				//$('html, body').animate({scrollTop: 0}, 'fast')
+				$('html, body').animate({scrollTop: 0}, 'fast')
 
 				//if this is a new item (id is falsy), just overwrite the viewModel with the original data model
 				if (!id)
@@ -566,19 +432,6 @@
 				//set the last item property which helps manage the animation states
 				this.lastItem = 0;
 
-				var data = {};
-
-				// 新建时加载 belongs_to_many 或 has_many 的默认值
-				$.each(adminData.edit_fields, function(ind, el)
-				{
-					if(el.type == 'belongs_to_many' || el.type == 'has_many'){
-						if(el.value){
-							data[ind] = el.value;
-						}
-					}
-				});
-				ko.mapping.updateData(this, this.model, data);
-
 				this.loadingItem(false);
 
 				//run the constraints queue
@@ -606,9 +459,6 @@
 				//update the actions and the action permissions
 				self.actions(data.administrator_actions);
 				self.actionPermissions = data.administrator_action_permissions;
-
-				//set the original values
-				self.originalData = data;
 
 				//set the new options for relationships
 				$.each(adminData.edit_fields, function(ind, el)
@@ -652,8 +502,7 @@
 			 */
 			closeItem: function()
 			{
-				History.pushState({modelName: this.modelName()}, document.title, route + this.modelName());
-				$('#sidebar').fadeIn();
+				History.pushState({modelName: this.modelName()}, null, route + this.modelName());
 			},
 
 			/**
@@ -797,10 +646,7 @@
 						_token: csrf,
 						sortOptions: self.sortOptions,
 						filters: self.getFilters(),
-						page: self.pagination.page(),
-						// hack by @Monkey: for paging logic
-						filter_by: self.filter_by,
-						filter_by_id: self.filter_by_id
+						page: self.pagination.page()
 					};
 
 				//if the page hasn't been initialized yet, don't update the rows
@@ -862,10 +708,10 @@
 
 				//the direction depends on the field
 				if (field == this.sortOptions.field())
-				//reverse the direction
+					//reverse the direction
 					this.sortOptions.direction( (this.sortOptions.direction() == 'asc') ? 'desc' : 'asc' );
 				else
-				//set the direction to asc
+					//set the direction to asc
 					this.sortOptions.direction('asc');
 
 				//update the field
@@ -983,18 +829,6 @@
 			},
 
 			/**
-			 * Determines if the provided field is dirty
-			 *
-			 * @param string
-			 *
-			 * @return bool
-			 */
-			fieldIsDirty: function(field)
-			{
-				return this.originalData[field] != this[field]();
-			},
-
-			/**
 			 * Updates any self-relationships
 			 */
 			updateSelfRelationships: function()
@@ -1097,7 +931,6 @@
 			this.viewModel.columns(this.prepareColumns());
 			this.viewModel.modelName(adminData.model_name);
 			this.viewModel.modelTitle(adminData.model_title);
-			this.viewModel.subTitle(adminData.sub_title);
 			this.viewModel.modelSingle(adminData.model_single);
 			this.viewModel.expandWidth(adminData.expand_width);
 			this.viewModel.rowsPerPage(adminData.rows_per_page);
@@ -1106,15 +939,11 @@
 			this.viewModel.globalActions(adminData.global_actions);
 			this.viewModel.actionPermissions = adminData.action_permissions;
 			this.viewModel.languages = adminData.languages;
-			// hack by @Monkey: for paging logic
-			this.viewModel.filter_by = adminData.filter_by;
-			this.viewModel.filter_by_id = adminData.filter_by_id;
 
 			//set up the rowsPerPageOptions
-			var perPageArr = [20, 50, 100, 200, 500, 1000, 2000, 5000, 8000, 10000];
-			for (var i = 0; i < perPageArr.length; i++)
+			for (var i = 1; i <= 100; i++)
 			{
-				this.viewModel.rowsPerPageOptions.push({id: perPageArr[i], text: perPageArr[i] + ''});
+				this.viewModel.rowsPerPageOptions.push({id: i, text: i + ''});
 			}
 
 			//now that we have most of our data, we can set up the computed values
@@ -1150,7 +979,6 @@
 			setTimeout(function()
 			{
 				self.viewModel.initialized(true);
-
 			}, 1000);
 
 			return this;
@@ -1265,17 +1093,6 @@
 			{
 				if (el.relationship)
 					self.viewModel.listOptions[ind] = el.options;
-
-				// add any loaded option to the autocomplete array
-				if (el.autocomplete)
-				{
-					if(! (el.field_name + '_autocomplete' in self.viewModel) )
-						self.viewModel[el.field_name + '_autocomplete'] = [];
-					$.each(el.options, function(x, option)
-					{
-						self.viewModel[el.field_name + '_autocomplete'][option.id] = option;
-					});
-				}
 			});
 		},
 
@@ -1546,14 +1363,11 @@
 			$('#content').on('click', 'div.results_header a.new_item', function(e)
 			{
 				e.preventDefault();
-				History.pushState({modelName: self.viewModel.modelName(), id: 0}, document.title, route + self.viewModel.modelName() + '/new');
+				History.pushState({modelName: self.viewModel.modelName(), id: 0}, null, route + self.viewModel.modelName() + '/new');
 			});
 
 			//resizing the window
 			$(window).resize(self.resizePage);
-
-			//mousedowning or keypressing anywhere should resize the page as well
-			$('body').on('mouseup keypress', self.resizePage);
 
 			//set up the history event callback
 			History.Adapter.bind(window,'statechange',function() {
@@ -1566,9 +1380,9 @@
 
 				//if the model name is present
 				if ('modelName' in state.data)
-				//if that model name isn't the current model name, we are updating the model
+					//if that model name isn't the current model name, we are updating the model
 					if (state.data.modelName !== self.viewModel.modelName())
-					//get the new model
+						//get the new model
 						self.viewModel.getNewModel(state.data);
 
 				//if the state data has an id field and if it's not the active item
@@ -1610,7 +1424,7 @@
 						uri += '/' + (historyData.id ? historyData.id : 'new');
 
 						//now call the same to trigger the statechange event
-						History.pushState(historyData, document.title, uri);
+						History.pushState(historyData, null, uri);
 
 						clearInterval(timer);
 					}
@@ -1662,70 +1476,17 @@
 		 */
 		resizePage: function()
 		{
-			setTimeout(function()
-			{
-				var winHeight = $(window).height(),
-					itemEditHeight = $('div.item_edit').outerHeight() + 50,
-					usedHeight = winHeight > itemEditHeight ? winHeight - 45 : itemEditHeight,
-					size = window.getComputedStyle(document.body, ':after').getPropertyValue('content');
+			var winHeight = $(window).height(),
+				itemEditHeight = $('form.edit_form').height() + 50,
+				usedHeight = winHeight > itemEditHeight ? winHeight - 45 : itemEditHeight,
+				size = window.getComputedStyle(document.body, ':after').getPropertyValue('content');
 
-				//resize the page height
-				$('#admin_page').css({minHeight: usedHeight+45});
+			//resize the page height
+			$('#admin_page').css({minHeight: usedHeight});
 
-				//resize or scroll the data table
-				if (window.admin) {
-					if (! window.admin.dataTableScrollable)
-						window.admin.resizeDataTable();
-					else
-						window.admin.scrollDataTable();
-				}
-
-
-				// Popover with html
-	            $('.popover-with-html').popover({
-					 html : true,
-					//  trigger : 'click hover',
-					 trigger : 'manual',
-                     container: 'body',
-					 placement: 'top',
-					 delay: {show: 50, hide: 400},
-					 content: function () {
-					 	return $(this).attr('hint');
-					 }
-				 }).on("mouseenter", function () {
-                    var _this = this;
-                    $(this).popover("show");
-                    $(".popover").on("mouseleave", function () {
-                        $(_this).popover('hide');
-                    });
-                }).on("mouseleave", function () {
-                    var _this = this;
-                    setTimeout(function () {
-                        if (!$(".popover:hover").length) {
-                            $(_this).popover("hide");
-                        }
-                    }, 400);
-                });
-
-			}, 50);
-		},
-
-		/**
-		 * Allows to scroll wide data tables (alternative to resizeDataTable)
-		 */
-		scrollDataTable: function()
-		{
-			if (!self.$tableContainer)
-			{
-				self.$tableContainer = $('div.table_container');
-				self.$dataTable = self.$tableContainer.find('table.results');
-			}
-
-			// exit if table is already wrapped
-			if (self.$dataTable.parent().hasClass('table_scrollable')) return true;
-
-			// wrap table within div.table_scrollable
-			self.$dataTable.wrap('<div class="table_scrollable"></div>')
+			//resize the data table
+			if (window.admin)
+				window.admin.resizeDataTable();
 		},
 
 		/**
@@ -1771,67 +1532,11 @@
 			}
 		}
 	};
+
+
 	//set up the admin instance
 	$(function() {
-		if ($('#admin_page').length) {
+		if ($('#admin_page').length)
 			window.admin = new admin();
-		}
-
-	    // 二维码
-	    var qrcode = new QRCode(document.getElementById('qrcode-img'), {
-	        text: 'http://tianyinzaixian.com',
-	        width: 320,
-	        height: 320
-	    });
-
-    	// $('#qrcode-img').attr('title', '')
-		$(document).on( 'click', '.get-qrcode-btn', function(e)
-		{
-			e.preventDefault();
-
-			// 重新生成二维码
-			qrcode.clear(); // clear the code.
-			qrcode.makeCode($(this).attr('data-link')); // make another code.
-
-			$('#getQrcode').modal('show');
-
-		});
-
-		// select all items
-		$('#select-all').on('click', function() {
-			var checked = false;
-
-			if ($(this).is(':checked')) {
-				$('.select-checkbox').prop('checked', true);
-				checked = true;
-			} else {
-				$('.select-checkbox').prop('checked', false);
-			}
-
-			if (checked && $('.select-checkbox').length) {
-				$('#delete-all').removeClass('disabled');
-			} else {
-				$('#delete-all').addClass('disabled');
-			}
-		});
-
-		// disable delete-all btn
-		$('.select-checkbox').on('click', function() {
-			var selected = 0;
-
-			$('.select-checkbox').each(function(i, el) {
-				if ($(el).is(':checked')) {
-					selected++;
-				}
-			});
-
-			if (selected > 0) {
-				$('#delete-all').removeClass('disabled');
-			} else {
-				$('#delete-all').addClass('disabled');
-			}
-		});
-
-		$('[data-toggle="tooltip"]').tooltip();
 	});
 })(jQuery);

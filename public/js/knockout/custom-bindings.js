@@ -240,10 +240,7 @@
 					var data = [],
 						val = $(element).val();
 
-					// If the select2 field has a default value,
-					// initSelection will be called before the admin object
-					// is correctly initialized. 
-					if (!val || typeof admin === 'undefined')
+					if (!val)
 						return callback(null);
 
 					//if this is a multi-select, set up the data as an array
@@ -251,15 +248,13 @@
 					{
 						$(element.val().split(',')).each(function(ind, el)
 						{
-							if(this in admin.viewModel[options.field + '_autocomplete'])
-								data.push({id: this, text: admin.viewModel[options.field + '_autocomplete'][this].text});
+							data.push({id: this, text: admin.viewModel[options.field + '_autocomplete'][this].text});
 						});
 					}
 					//otherwise make the data a simple object
 					else
 					{
-						if(val in admin.viewModel[options.field + '_autocomplete'])
-							data = {id: val, text: admin.viewModel[options.field + '_autocomplete'][val].text};
+						data = {id: val, text: admin.viewModel[options.field + '_autocomplete'][val].text};
 					}
 
 					callback(data);
@@ -552,11 +547,7 @@
 				editor = editors[options.id];
 			else
 			{
-				$element.ckeditor({
-					language : language,
-					readOnly : !adminData.edit_fields[context.field_name].editable
-				});
-
+				$element.ckeditor({ language : language });
 				editor = $element.ckeditorGet();
 				editors[options.id] = editor;
 			}
@@ -588,15 +579,15 @@
 			}
 
 			//handle destroying an editor (based on what jQuery plugin does)
-			ko.utils.domNodeDisposal.addDisposeCallback(element, function (test) {
-				var editor = editors[options.id];
+	        ko.utils.domNodeDisposal.addDisposeCallback(element, function (test) {
+	            var editor = editors[options.id];
 
-				if (editor)
-				{
-					editor.destroy();
-					delete editors[options.id];
-				}
-			});
+	            if (editor)
+	        	{
+		        	editor.destroy();
+		        	delete editors[options.id];
+	        	}
+	        });
 		},
 		update: function (element, valueAccessor, allBindingsAccessor, context)
 		{
@@ -635,7 +626,7 @@
 	 * The markdown binding is attached to the field next a markdown textarea
 	 */
 	 ko.bindingHandlers.markdown = {
-		update: function (element, valueAccessor, allBindingsAccessor, context)
+	 	update: function (element, valueAccessor, allBindingsAccessor, context)
 		{
 			//handle programmatic updates to the observable
 			var value = ko.utils.unwrapObservable(valueAccessor());
@@ -651,26 +642,6 @@
 		}
 	 };
 
-	/**
-	 * The enumText binding converts a value and an options array to a "Label (value)" readable format
-	 */
-	ko.bindingHandlers.enumText = {
-		update: function (element, valueAccessor, allBindingsAccessor, viewModel)
-		{
-			var options = valueAccessor(),
-				value = options.value,
-				enumOptions = options.enumOptions;
-
-			for (var i = 0; i < enumOptions.length; i++) {
-				if(enumOptions[i].id == value) {
-					$(element).html( enumOptions[i].text + " (" + value + ")" );
-					return;
-				}
-			}
-
-			$(element).html(value);
-		}
-	};
 
 	/**
 	 * File uploader using plupload
@@ -693,15 +664,12 @@
 				url: options.upload_url,
 				flash_swf_url: asset_url + 'js/plupload/js/plupload.flash.swf',
 				silverlight_xap_url: asset_url + 'js/plupload/js/plupload.silverlight.xap',
-				filters: filters,
-				multipart_params: {"_token" : window.csrf}
+				filters: filters
 			});
 
 			viewModel[cacheName].init();
 
 			viewModel[cacheName].bind('FilesAdded', function(up, files) {
-
-				viewModel.freezeActions(true);
 
 				$(files).each(function(i, file) {
 					//parent.uploader.removeFile(file);
@@ -741,7 +709,6 @@
 					viewModel[cacheName].splice();
 					viewModel[cacheName].refresh();
 					$('div.plupload').css('z-index', 71);
-					viewModel.freezeActions(false);
 					admin.resizePage();
 				}, 200);
 			});

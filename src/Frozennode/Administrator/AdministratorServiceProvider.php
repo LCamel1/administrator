@@ -34,7 +34,7 @@ class AdministratorServiceProvider extends ServiceProvider
             __DIR__.'/../../config/administrator.php' => config_path('administrator.php'),
         ]);
         $this->publishes([
-            __DIR__.'/../../../public' => public_path('packages/summerblue/administrator'),
+            __DIR__.'/../../../public' => public_path('packages/frozennode/administrator'),
         ], 'public');
         //set the locale
         $this->setLocale();
