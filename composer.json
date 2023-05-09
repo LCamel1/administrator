@@ -1,17 +1,14 @@
 {
-	"name": "summerblue/administrator",
+	"name": "lcamel1/administrator",
 	"description": "A database interface package for Laravel, modified!",
-	"homepage": "https://github.com/summerblue/administrator",
+	"homepage": "https://github.com/LCamel1/administrator.git",
 	"keywords": ["administrator", "admin", "database", "laravel-administrator", "laravel", "cms"],
 	"license": "MIT",
 	"authors": [
-		{
-			"name": "Summer",
-			"email": "summer@learnku.com"
-		}
+		
 	],
 	"support": {
-		"issues": "https://github.com/summerblue/administrator/issues"
+		"issues": "https://github.com/LCamel1/administrator/issues"
 	},
 	"require": {
 		"php": ">=7.0.0",
